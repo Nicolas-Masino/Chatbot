@@ -1,0 +1,32 @@
+# --- Interfaz ---
+chainlit>=2.0
+
+# --- Orquestación del agente ---
+langchain>=0.3
+langchain-core>=0.3
+langchain-community>=0.3
+langchain-text-splitters>=0.3
+langgraph>=0.2            # opcional, si preferís LangGraph al AgentExecutor
+
+# --- LLM (elegí UNO) ---
+langchain-openai>=0.2
+# langchain-anthropic>=0.2
+# langchain-ollama>=0.2   # modelo local
+
+# --- RAG: embeddings y vector store ---
+langchain-huggingface>=0.1
+sentence-transformers>=3.0   # embeddings multilingües (ver nota abajo)
+langchain-chroma>=0.1
+chromadb>=0.5
+pypdf>=4.0                   # leer los PDF de OMS, OIT y UNESCO-IESALC
+
+# --- Capa NLP y métricas ---
+transformers>=4.40
+scikit-learn>=1.4            # accuracy, F1, matriz de confusión
+pandas>=2.0
+matplotlib>=3.8
+seaborn>=0.13
+
+# --- Utilidades ---
+pydantic>=2.0                # salida estructurada del análisis NLP
+python-dotenv>=1.0           # leer la API key desde .env
