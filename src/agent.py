@@ -1,12 +1,16 @@
 import os
+import logging
 from openai import OpenAI
-from .config import Settings
+from .config import Settings, LOGFILE, LOGFORMAT
 from .metrics import Metrics
 from .rag import EvidenceStore
 from .safety import assess_safety
 from .tools import analizar_situacion, consultar_evidencia
 from time import perf_counter
 
+# Crear logger para el agente conversacional
+logging.basicConfig(filename=LOGFILE, level=logging.INFO, format=LOGFORMAT)
+logger = logging.getLogger("Agent")
 
 class ConversationalAgent:
     def __init__(self, settings: Settings | None = None) -> None:
@@ -15,31 +19,34 @@ class ConversationalAgent:
         self.history: list[dict] = []  # Historial en formato de mensajes de OpenAI
         self.metrics = Metrics()
         
-        # Inicializar el cliente de OpenAI (toma OPENAI_API_KEY del entorno)
-        #self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        self.client = OpenAI(
-            base_url="https://ollama.com/v1",
-            api_key=self.settings.api_key,
-        )
+        # Inicializar el cliente de OpenAI
+        self.client = OpenAI(api_key=self.settings.api_key)
+        #self.client = OpenAI(base_url="https://ollama.com/v1", api_key=self.settings.api_key)
 
     def respond(self, message: str, model: str) -> str:
+        logger.info(f"Mensaje recibido: {message}")
         started_at = perf_counter()
         self.model = model 
-        print(f"Usando modelo: {self.model}")
         
         # 1. Validación de seguridad (Guardrail prioritario ante riesgo urgente)
         safety = assess_safety(message)
+        logger.info(f"Evaluación de seguridad: {safety.level} | Evidencia: {safety.response}")
+
         if safety.level == "urgent":
             response = safety.response or "Buscá ayuda humana inmediata y comunicate con emergencias."
             # Guardar en historial
             self.history.append({"role": "user", "content": message})
             self.history.append({"role": "assistant", "content": response})
             self.metrics.observe(started_at, urgent=True, evidence_hits=0)
+            logger.warning(f"Mensaje marcado como urgente: {message} | Respuesta: {response}")
+            logger.info(f"Metricas actualizadas: {self.metrics}")
             return response
 
         # 2. Ejecutar herramientas y análisis NLP local
         analysis = analizar_situacion(message)
         evidence = consultar_evidencia(message, self.store)
+        logger.info(f"Análisis de la situación: {analysis}")
+        logger.info(f"Evidencia encontrada: {evidence}")
 
         # 3. Preparar el contexto de la evidencia para el LLM
         evidence_text = ""
@@ -84,10 +91,13 @@ class ConversationalAgent:
 
         except Exception as e:
             response = f"Disculpáme, ocurrió un error al comunicarme con el servicio de IA. Por favor, intentá nuevamente en unos instantes."
+            logger.error(f"Error en la consulta: {e}")
 
         # 7. Actualizar historial de la sesión y métricas
         self.history.append({"role": "user", "content": message})
         self.history.append({"role": "assistant", "content": response})
         self.metrics.observe(started_at, urgent=False, evidence_hits=len(evidence))
+        logger.info(f"Respuesta generada: {response}")
+        logger.info(f"Metricas actualizadas: {self.metrics}")
 
         return response

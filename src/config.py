@@ -1,5 +1,12 @@
 from dataclasses import dataclass
 import os
+import datetime
+
+LOGS_DIR = "data/logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DAY = datetime.datetime.now().strftime("%Y-%m-%d")
+LOGFORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOGFILE = LOGS_DIR / f"{LOG_DAY}_conversation.log"
 
 @dataclass(frozen=True)
 class Settings:
