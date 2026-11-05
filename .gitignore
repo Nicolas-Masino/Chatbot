@@ -226,4 +226,4 @@ docker-compose.override.yml
 Dockerfile.geoserver
 
 # files
-.pdf
+*.pdf
