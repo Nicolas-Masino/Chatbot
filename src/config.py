@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from pathlib import Path
 import os
 import datetime
 
-LOGS_DIR = "data/logs"
+LOGS_DIR = Path("data/logs")
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DAY = datetime.datetime.now().strftime("%Y-%m-%d")
 LOGFORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

@@ -5,8 +5,8 @@ from .nlp import analyze
 from .resources import verified_resources
 
 
-def analizar_situacion(text: str) -> dict:
-    return asdict(analyze(text))
+async def analizar_situacion(text: str) -> dict:
+    return await analyze(text)
 
 
 def consultar_evidencia(text: str, store: EvidenceStore | None = None) -> list[dict]:
