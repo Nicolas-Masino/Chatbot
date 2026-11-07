@@ -1,12 +1,14 @@
 import os
 import logging
+import chainlit as cl
 from openai import OpenAI
 from .config import Settings, LOGFILE, LOGFORMAT
 from .metrics import Metrics
 from .rag import EvidenceStore
-from .safety import assess_safety
+from .safety import safety_from_llm, safety_from_re, assess_safety
 from .tools import analizar_situacion, consultar_evidencia
 from time import perf_counter
+from langchain_core.runnables import RunnableParallel, RunnableLambda
 
 # Crear logger para el agente conversacional
 logging.basicConfig(filename=LOGFILE, level=logging.INFO, format=LOGFORMAT)
@@ -23,14 +25,24 @@ class ConversationalAgent:
         self.client = OpenAI(api_key=self.settings.api_key)
         #self.client = OpenAI(base_url="https://ollama.com/v1", api_key=self.settings.api_key)
 
-    def respond(self, message: str, model: str) -> str:
+    async def respond(self, message: str) -> str:
         logger.info(f"Mensaje recibido: {message}")
         started_at = perf_counter()
-        self.model = model 
         
-        # 1. Validación de seguridad (Guardrail prioritario ante riesgo urgente)
-        safety = assess_safety(message)
-        logger.info(f"Evaluación de seguridad: {safety.level} | Evidencia: {safety.response}")
+        # 1. Validación de seguridad en paralelo: aplica un guardrail rapido y local basado
+        # en regex y una segunda capa basado en el LLM para mayor análisis
+        safety_rules = RunnableParallel(
+            guardrail=RunnableLambda(cl.make_async(safety_from_re)),
+            llm_analysis=RunnableLambda(analizar_situacion)
+        )
+        safety_results = await safety_rules.ainvoke(message)
+
+        analysis = safety_results["llm_analysis"]
+
+        safety_guardrail = safety_results["guardrail"]
+        safety_llm = safety_from_llm(analysis=analysis)
+        safety = assess_safety(safety_guardrail, safety_llm)
+        logger.info(f"Evaluación de seguridad: {safety.level} | Evidencia: {safety.reason}")
 
         if safety.level == "urgent":
             response = safety.response or "Buscá ayuda humana inmediata y comunicate con emergencias."
@@ -42,8 +54,7 @@ class ConversationalAgent:
             logger.info(f"Metricas actualizadas: {self.metrics}")
             return response
 
-        # 2. Ejecutar herramientas y análisis NLP local
-        analysis = analizar_situacion(message)
+        # 2. Ejecutar herramientas
         evidence = consultar_evidencia(message, self.store)
         logger.info(f"Análisis de la situación: {analysis}")
         logger.info(f"Evidencia encontrada: {evidence}")
